@@ -1,0 +1,26 @@
+{
+  "name": "skillswap-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "convex:dev": "npx convex dev",
+    "convex:deploy": "npx convex deploy"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^5.0.0",
+    "convex": "^1.17.0",
+    "@convex-dev/auth": "^0.0.74",
+    "next": "^14.2.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "openai": "^4.50.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.3.0",
+    "typescript": "^5.5.0"
+  }
+}
