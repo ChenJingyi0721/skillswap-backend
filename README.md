@@ -1,6 +1,15 @@
 # SkillSwap Backend
 
-基于 **Convex + Clerk + Next.js** 的技能交换平台后端，采用 Multi-Agent 架构实现智能匹配、推荐、评分和 NFT 信任背书。
+基于 **Convex + Clerk + Next.js** 的技能交换平台后端，采用 Multi-Agent 架构实现智能匹配、推荐、**渐进式评分**和 NFT 信任背书。
+
+## 核心特性
+
+- **渐进式技能评分**：AI 社交媒体分析 (30%) + 社区反馈 (50%) + NFT 成就 (20%)
+- **AI 社交媒体分析**：授权绑定 B站/小红书/YouTube/公众号，AI 从持续性、深度、社区认可三维度评估
+- **交换反馈帖**：交换确认后自动开启公开反馈区，记录学习进度和互动
+- **Soul 式成就系统**：互动里程碑点亮，从「初识」到「灵魂伙伴」渐进式关系升级
+- **故事型 NFT**：AI 生成交换故事 + 贡献度自动分配，NFT 橱窗展示交换背后的故事
+- **Multi-Agent 智能匹配**：TrueSkill 评分 + NFT 交换次数加权匹配
 
 ## 技术栈
 
@@ -9,32 +18,36 @@
 | 前端 | Next.js 14 + React 18 + Tailwind CSS | SSR 页面渲染 + Clerk 鉴权组件 + Convex SDK 实时订阅 |
 | 鉴权 | Clerk | 登录/注册/JWT/用户管理/Webhook 同步 |
 | 后端 | Convex | 实时数据库 + Serverless 函数 + 文件存储 |
-| AI | OpenAI / 通义千问 (qwen-plus) | 翻译/合同生成/日程建议/AI 配对助手 |
-| Web3 | Polygon (可选) | NFT 技能凭证链上验证 |
+| AI | OpenAI / 通义千问 (qwen-plus) | 社交媒体分析/翻译/合同/日程/配对助手/NFT 故事生成 |
+| Web3 | Polygon (可选) | NFT 技能凭证 + 交换见证链上验证 |
 
 ## 项目结构
 
 ```
 skillswap-backend/
 ├── convex/                        # Convex 后端（核心）
-│   ├── schema.ts                  # 数据库 Schema（10 张表）
+│   ├── schema.ts                  # 数据库 Schema（16 张表）
 │   ├── auth.ts                    # Clerk 鉴权工具函数
 │   ├── auth.config.ts             # Convex 鉴权配置（Clerk Issuer）
 │   ├── http.ts                    # HTTP 路由（Clerk Webhook 用户同步）
 │   ├── users.ts                   # 用户 CRUD + Onboarding
 │   ├── skills.ts                  # 技能 CRUD + 相似专家推荐
-│   ├── sessions.ts                # 交换会话管理（预约/接受/完成）
+│   ├── sessions.ts                # 交换会话管理（自动触发反馈帖+里程碑）
 │   ├── contacts.ts                # 联系人管理（双向自动添加）
 │   ├── messages.ts                # 实时消息（已读/未读状态）
 │   ├── posts.ts                   # 社区帖子 + 动态 + 评价
 │   ├── ai.ts                      # AI 处理（翻译/合同/配对聊天）
+│   ├── socialMedia.ts             # 社交媒体绑定 + AI 内容分析
+│   ├── exchangeThreads.ts         # 交换反馈帖（自动创建 + CRUD）
+│   ├── milestones.ts              # Soul 式成就系统（互动里程碑）
+│   ├── progressiveScoring.ts      # 渐进式综合评分引擎
 │   ├── seed.ts                    # Demo 数据生成（3 用户完整数据）
 │   └── agents/                    # Multi-Agent 系统
 │       ├── orchestrator.ts        # 中枢调度 Agent（统一入口）
 │       ├── matching.ts            # 匹配 Agent（TrueSkill + NFT 权重）
 │       ├── recommendation.ts      # 推荐 Agent（历史 + 标签相似度）
 │       ├── rating.ts              # 评分 Agent（TrueSkill 更新 + 评价）
-│       └── nft.ts                 # NFT Agent（铸造 + 验证 + 查询）
+│       └── nft.ts                 # NFT Agent（铸造 + 故事NFT + 橱窗）
 ├── app/                           # Next.js 前端
 │   ├── layout.tsx                 # 根布局（Clerk + Convex Provider）
 │   ├── providers.tsx              # 全局 Provider 注入
@@ -232,6 +245,57 @@ const { reply, matchSuggestion } = await matchChat({
 const handleAction = useMutation(api.agents.orchestrator.handleUserAction);
 const matches = await handleAction({ action: "match", payload: { skillTag: "React" } });
 ```
+
+## 渐进式评分系统
+
+```
+渐进式技能评分 (Progressive Skill Rating)
+    │
+    ├── 维度一：AI 社交媒体分析 (30%)
+    │   ├── 授权绑定 B站 / 小红书 / YouTube / 公众号
+    │   ├── AI 读取解析：文本、视频、图片、评论区
+    │   └── 评分维度：持续性(40%) × 深度(35%) × 社区认可(25%)
+    │
+    ├── 维度二：社区反馈 (50%)
+    │   ├── 公开反馈帖（交换确认后自动触发）
+    │   ├── 私聊互动（Soul 式里程碑点亮）
+    │   └── 双方互评（TrueSkill 更新）
+    │
+    └── 维度三：NFT 成就 (20%)
+        ├── 交换见证 NFT（AI 生成故事 + 贡献度分配）
+        ├── NFT 橱窗（展示交换故事和能力背书）
+        └── 成就集卡（互动解锁勋章）
+```
+
+### Soul 式成就系统
+
+| 关系等级 | 条件 | 勋章 |
+|---------|------|------|
+| 🤝 初识 | 完成 1 次交换 | 初次交换 |
+| 📚 活跃 | 发布 3+ 反馈 | 活跃学习者 |
+| 💬 知音 | 私聊 50+ 条 | 知音 |
+| ⚡ 搭档 | 7天互动 + 3次交换 | 默契搭档 |
+| ✨ 灵魂伙伴 | 30天 + 5次交换 + 200消息 + 10反馈 | 灵魂伙伴 |
+
+### 新增 API
+
+| 函数 | 类型 | 说明 |
+|------|------|------|
+| `socialMedia.linkAccount` | Mutation | 绑定社交媒体账号 |
+| `socialMedia.analyzeAccount` | Action | AI 分析社交媒体内容 |
+| `socialMedia.getSocialScore` | Query | 获取社交媒体评分 |
+| `exchangeThreads.createThread` | Mutation | 创建交换反馈帖 |
+| `exchangeThreads.addPost` | Mutation | 发布反馈（进度/反馈/表扬） |
+| `exchangeThreads.listPublicThreads` | Query | 公开反馈帖列表 |
+| `milestones.updateInteraction` | Mutation | 更新互动数据 + 解锁成就 |
+| `milestones.getMilestone` | Query | 获取双方互动里程碑 |
+| `milestones.getMyBadges` | Query | 获取所有成就勋章 |
+| `agents.nft.mintStoryNft` | Mutation | 铸造交换见证 NFT |
+| `agents.nft.getShowcase` | Query | NFT 橱窗展示 |
+| `agents.nft.viewStory` | Mutation | 查看 NFT 故事详情 |
+| `progressiveScoring.recalculate` | Mutation | 重算渐进式综合评分 |
+| `progressiveScoring.getScore` | Query | 获取评分详情 |
+| `progressiveScoring.getLeaderboard` | Query | 排行榜 |
 
 ## 部署
 

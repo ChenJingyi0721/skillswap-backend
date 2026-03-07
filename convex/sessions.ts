@@ -90,6 +90,9 @@ export const create = mutation({
 
 /**
  * PATCH /api/sessions/:id — 接受/取消/完成会话
+ * 状态变更时自动触发：
+ * - upcoming → 自动创建交换反馈帖
+ * - completed → 自动更新里程碑
  */
 export const updateStatus = mutation({
   args: {
@@ -115,6 +118,56 @@ export const updateStatus = mutation({
     if (args.roomLink) updates.roomLink = args.roomLink;
 
     await ctx.db.patch(args.sessionId, updates);
+
+    // 交换确认 → 自动创建反馈帖
+    if (args.status === "upcoming") {
+      const existingThread = await ctx.db
+        .query("exchangeThreads")
+        .withIndex("by_sessionId", (q) => q.eq("sessionId", args.sessionId))
+        .unique();
+
+      if (!existingThread) {
+        const requester = await ctx.db.get(session.requesterId);
+        const provider = await ctx.db.get(session.providerId);
+
+        await ctx.db.insert("exchangeThreads", {
+          sessionId: args.sessionId,
+          requesterId: session.requesterId,
+          providerId: session.providerId,
+          skillTag: session.title,
+          title: `${requester?.name ?? "学习者"} × ${provider?.name ?? "教授者"}：${session.title}`,
+          status: "active",
+          postCount: 1,
+          lastActivityAt: Date.now(),
+        });
+      }
+    }
+
+    // 交换完成 → 更新里程碑互动数据
+    if (args.status === "completed") {
+      const partnerId =
+        session.requesterId === user._id
+          ? session.providerId
+          : session.requesterId;
+
+      const [userIdA, userIdB] =
+        user._id < partnerId ? [user._id, partnerId] : [partnerId, user._id];
+
+      const milestone = await ctx.db
+        .query("milestones")
+        .withIndex("by_pair", (q) =>
+          q.eq("userIdA", userIdA).eq("userIdB", userIdB)
+        )
+        .unique();
+
+      if (milestone) {
+        await ctx.db.patch(milestone._id, {
+          sessionCount: milestone.sessionCount + 1,
+          lastInteractionAt: Date.now(),
+        });
+      }
+    }
+
     return { success: true };
   },
 });
