@@ -1,93 +1,148 @@
 # SkillSwap Backend
 
-基于 **Convex + Clerk + Next.js** 的技能交换平台后端，采用 Multi-Agent 架构实现智能匹配、推荐、**渐进式评分**和 NFT 信任背书。
+Backend API server for the [SkillSwap](https://github.com/mint1186870278-lgtm/SkillSwap) skill exchange platform.
 
-## 核心特性
+Built with **Next.js + Convex + Clerk + AI (Tongyi Qianwen)**, providing REST API endpoints that the frontend consumes.
 
-- **渐进式技能评分**：AI 社交媒体分析 (30%) + 社区反馈 (50%) + NFT 成就 (20%)
-- **AI 社交媒体分析**：授权绑定 B站/小红书/YouTube/公众号，AI 从持续性、深度、社区认可三维度评估
-- **交换反馈帖**：交换确认后自动开启公开反馈区，记录学习进度和互动
-- **Soul 式成就系统**：互动里程碑点亮，从「初识」到「灵魂伙伴」渐进式关系升级
-- **故事型 NFT**：AI 生成交换故事 + 贡献度自动分配，NFT 橱窗展示交换背后的故事
-- **Multi-Agent 智能匹配**：TrueSkill 评分 + NFT 交换次数加权匹配
+## Architecture
 
-## 技术栈
+```
+Frontend (Next.js)                    Backend (This Repo)
+┌──────────────────┐                 ┌───────────────────────────┐
+│  api-client.ts   │───── HTTP ────→ │  /api/* Route Handlers    │
+│  fetchApi()      │  (REST JSON)    │  ├── CORS middleware      │
+│                  │                 │  ├── ConvexHttpClient      │
+│  React Pages     │                 │  └── Response transform    │
+│  ├── Home        │                 │                           │
+│  ├── Explore     │                 │  Convex Serverless         │
+│  ├── Messages    │                 │  ├── users.ts             │
+│  ├── Exchange    │                 │  ├── skills.ts            │
+│  └── Profile     │                 │  ├── sessions.ts          │
+│                  │                 │  ├── messages.ts           │
+│  Clerk Auth ─────│── JWT Token ──→ │  ├── contacts.ts          │
+│                  │                 │  ├── posts.ts             │
+└──────────────────┘                 │  ├── ai.ts (AI Actions)   │
+                                     │  └── agents/*             │
+                                     │      ├── orchestrator.ts  │
+                                     │      ├── matching.ts      │
+                                     │      ├── rating.ts        │
+                                     │      └── nft.ts           │
+                                     │                           │
+                                     │  Convex Cloud (Real-time) │
+                                     └───────────────────────────┘
+```
 
-| 层级 | 技术 | 职责 |
-|------|------|------|
-| 前端 | Next.js 14 + React 18 + Tailwind CSS | SSR 页面渲染 + Clerk 鉴权组件 + Convex SDK 实时订阅 |
-| 鉴权 | Clerk | 登录/注册/JWT/用户管理/Webhook 同步 |
-| 后端 | Convex | 实时数据库 + Serverless 函数 + 文件存储 |
-| AI | OpenAI / 通义千问 (qwen-plus) | 社交媒体分析/翻译/合同/日程/配对助手/NFT 故事生成 |
-| Web3 | Polygon (可选) | NFT 技能凭证 + 交换见证链上验证 |
+## API Endpoints
 
-## 项目结构
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/user/me` | Current user profile |
+| GET | `/api/skills?category=&search=` | Skill listings |
+| GET | `/api/sessions?filter=&dashboard=` | Exchange sessions |
+| GET | `/api/contacts` | Messaging contacts |
+| GET | `/api/messages/:contactId` | Chat messages |
+| POST | `/api/messages/:contactId` | Send message |
+| GET | `/api/posts` | Community posts |
+| GET | `/api/community` | Community activity updates |
+| GET | `/api/user-posts` | Current user's posts |
+| GET | `/api/reviews` | User reviews |
+| GET | `/api/similar-experts?skillTag=` | Similar skill experts |
+| POST | `/api/ai/process` | AI translate / contract / schedule |
+| POST | `/api/ai/match/chat` | AI matching assistant |
+| POST | `/api/seed` | Seed demo data |
+
+See [FRONTEND_BACKEND_SPEC.md](./FRONTEND_BACKEND_SPEC.md) for detailed request/response formats.
+
+## Tech Stack
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| API Server | Next.js 14 | REST API route handlers + SSR |
+| Auth | Clerk | Login / JWT / User management |
+| Backend | Convex | Real-time database + Serverless functions |
+| AI | Tongyi Qianwen (qwen-plus) | Translation / Contract / Matching / Social analysis |
+| Web3 | Convex Storage (Polygon optional) | NFT skill credentials |
+
+## Project Structure
 
 ```
 skillswap-backend/
-├── convex/                        # Convex 后端（核心）
-│   ├── schema.ts                  # 数据库 Schema（16 张表）
-│   ├── auth.ts                    # Clerk 鉴权工具函数
-│   ├── auth.config.ts             # Convex 鉴权配置（Clerk Issuer）
-│   ├── http.ts                    # HTTP 路由（Clerk Webhook 用户同步）
-│   ├── users.ts                   # 用户 CRUD + Onboarding
-│   ├── skills.ts                  # 技能 CRUD + 相似专家推荐
-│   ├── sessions.ts                # 交换会话管理（自动触发反馈帖+里程碑）
-│   ├── contacts.ts                # 联系人管理（双向自动添加）
-│   ├── messages.ts                # 实时消息（已读/未读状态）
-│   ├── posts.ts                   # 社区帖子 + 动态 + 评价
-│   ├── ai.ts                      # AI 处理（翻译/合同/配对聊天）
-│   ├── socialMedia.ts             # 社交媒体绑定 + AI 内容分析
-│   ├── exchangeThreads.ts         # 交换反馈帖（自动创建 + CRUD）
-│   ├── milestones.ts              # Soul 式成就系统（互动里程碑）
-│   ├── progressiveScoring.ts      # 渐进式综合评分引擎
-│   ├── seed.ts                    # Demo 数据生成（3 用户完整数据）
-│   └── agents/                    # Multi-Agent 系统
-│       ├── orchestrator.ts        # 中枢调度 Agent（统一入口）
-│       ├── matching.ts            # 匹配 Agent（TrueSkill + NFT 权重）
-│       ├── recommendation.ts      # 推荐 Agent（历史 + 标签相似度）
-│       ├── rating.ts              # 评分 Agent（TrueSkill 更新 + 评价）
-│       └── nft.ts                 # NFT Agent（铸造 + 故事NFT + 橱窗）
-├── app/                           # Next.js 前端
-│   ├── layout.tsx                 # 根布局（Clerk + Convex Provider）
-│   ├── providers.tsx              # 全局 Provider 注入
-│   └── globals.css                # Tailwind CSS
+├── app/
+│   ├── api/                          # REST API routes (frontend calls these)
+│   │   ├── user/me/route.ts          # GET user profile
+│   │   ├── skills/route.ts           # GET skills list
+│   │   ├── sessions/route.ts         # GET sessions
+│   │   ├── contacts/route.ts         # GET contacts
+│   │   ├── messages/[contactId]/route.ts  # GET/POST messages
+│   │   ├── posts/route.ts            # GET community posts
+│   │   ├── community/route.ts        # GET community updates
+│   │   ├── reviews/route.ts          # GET reviews
+│   │   ├── user-posts/route.ts       # GET user's posts
+│   │   ├── similar-experts/route.ts  # GET similar experts
+│   │   ├── ai/process/route.ts       # POST AI processing
+│   │   ├── ai/match/chat/route.ts    # POST AI matching chat
+│   │   └── seed/route.ts             # POST seed data
+│   ├── layout.tsx                    # Root layout
+│   ├── page.tsx                      # API status page
+│   └── providers.tsx                 # Clerk + Convex providers
+├── convex/                           # Convex backend (core logic)
+│   ├── schema.ts                     # Database schema (16 tables)
+│   ├── auth.ts                       # Auth helper functions
+│   ├── auth.config.ts                # Clerk JWT validation config
+│   ├── users.ts                      # User CRUD + Onboarding
+│   ├── skills.ts                     # Skill CRUD + Expert matching
+│   ├── sessions.ts                   # Session management
+│   ├── contacts.ts                   # Contact management
+│   ├── messages.ts                   # Real-time messaging
+│   ├── posts.ts                      # Community posts + reviews
+│   ├── ai.ts                         # AI actions (translate/match)
+│   ├── socialMedia.ts                # Social media analysis
+│   ├── exchangeThreads.ts            # Exchange feedback threads
+│   ├── milestones.ts                 # Soul-style achievements
+│   ├── progressiveScoring.ts         # Progressive rating engine
+│   ├── seed.ts                       # Demo data seeding
+│   └── agents/                       # Multi-Agent system
+│       ├── orchestrator.ts           # Central dispatcher
+│       ├── matching.ts               # TrueSkill matching
+│       ├── recommendation.ts         # Personalized recommendations
+│       ├── rating.ts                 # Rating + TrueSkill update
+│       └── nft.ts                    # NFT minting + stories
 ├── lib/
-│   └── convex.ts                  # Convex 客户端实例
-├── middleware.ts                  # Clerk 路由保护中间件
-├── next.config.js                 # Next.js 配置
+│   ├── convex-server.ts              # Server-side Convex HTTP client
+│   └── cors.ts                       # CORS middleware
+├── middleware.ts                     # Clerk route protection
 └── package.json
 ```
 
-## 快速开始
+## Quick Start
 
-### 1. 安装依赖
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-### 2. 配置环境变量
+### 2. Configure environment variables
 
-复制 `.env.local.example` 为 `.env.local`，填入：
+Copy `.env.local.example` to `.env.local` and fill in:
 
 ```env
-# Clerk 鉴权（https://dashboard.clerk.com → API Keys）
+# Clerk Auth (https://dashboard.clerk.com → API Keys)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxx
 CLERK_SECRET_KEY=sk_test_xxx
 
-# Convex（npx convex dev 自动生成）
+# Convex (auto-generated by npx convex dev)
 NEXT_PUBLIC_CONVEX_URL=https://your-project.convex.cloud
 
-# AI 功能（通义千问 或 OpenAI）
+# AI (Tongyi Qianwen or OpenAI)
 OPENAI_API_KEY=sk-xxx
 OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 AI_MODEL=qwen-plus
 ```
 
-### 3. 配置 Convex 环境变量
+### 3. Set Convex environment variables
 
-在 [Convex Dashboard](https://dashboard.convex.dev) → Settings → Environment Variables 中设置：
+In [Convex Dashboard](https://dashboard.convex.dev) → Settings → Environment Variables:
 
 ```
 CLERK_ISSUER_URL=https://your-clerk-domain.clerk.accounts.dev
@@ -96,220 +151,81 @@ OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 AI_MODEL=qwen-plus
 ```
 
-### 4. 初始化 Convex
+### 4. Initialize Convex
 
 ```bash
 npx convex login
 npx convex dev
 ```
 
-### 5. 生成 Demo 数据
+### 5. Seed demo data
 
-在 Convex Dashboard → Functions 中运行 `seed:seedDemoData`。
+In Convex Dashboard → Functions, run `seed:seedDemoData`.
 
-### 6. 启动开发服务器
+Or call: `POST http://localhost:3000/api/seed`
+
+### 6. Start dev server
 
 ```bash
 npm run dev
 ```
 
-访问 http://localhost:3000
+Backend runs at http://localhost:3000
 
-## 后端 API 一览
+## Frontend Connection
 
-### 用户模块 (`users.ts`)
+In the frontend's `.env.local`:
 
-| 函数 | 类型 | 说明 |
-|------|------|------|
-| `users.me` | Query | 获取当前登录用户 |
-| `users.syncUser` | Mutation | Clerk→Convex 用户同步 |
-| `users.completeOnboarding` | Mutation | 保存 Onboarding 数据 + 初始化 TrueSkill |
-| `users.updateProfile` | Mutation | 更新用户资料 |
-
-### 技能模块 (`skills.ts`)
-
-| 函数 | 类型 | 说明 |
-|------|------|------|
-| `skills.list` | Query | 技能列表（支持分类/搜索过滤） |
-| `skills.getById` | Query | 技能详情 |
-| `skills.create` | Mutation | 发布新技能（自动关联 TrueSkill） |
-| `skills.getSimilarExperts` | Query | 按技能推荐相似专家 |
-
-### 会话模块 (`sessions.ts`)
-
-| 函数 | 类型 | 说明 |
-|------|------|------|
-| `sessions.list` | Query | 会话列表（支持 filter/dashboard 模式） |
-| `sessions.create` | Mutation | 发起交换预约 |
-| `sessions.updateStatus` | Mutation | 接受/取消/完成会话 |
-
-### 消息模块 (`messages.ts`)
-
-| 函数 | 类型 | 说明 |
-|------|------|------|
-| `messages.listByContact` | Query | 获取与联系人的消息历史 |
-| `messages.send` | Mutation | 发送消息（自动更新联系人列表） |
-| `messages.markRead` | Mutation | 标记消息已读 |
-
-### AI 模块 (`ai.ts`)
-
-| 函数 | 类型 | 说明 |
-|------|------|------|
-| `ai.processAI` | Action | AI 通用处理（translate/contract/schedule） |
-| `ai.matchChat` | Action | AI 配对助手多轮对话 |
-| `ai.saveConversation` | Mutation | 保存 AI 对话历史 |
-
-### Multi-Agent 系统
-
-| 函数 | 类型 | 说明 |
-|------|------|------|
-| `agents.orchestrator.handleUserAction` | Mutation | 中枢调度（match/recommend/rating/nft_mint） |
-| `agents.matching.findMatches` | Mutation | TrueSkill 70% + NFT 30% 智能匹配 |
-| `agents.matching.getCachedMatches` | Query | 查询缓存的匹配结果 |
-| `agents.recommendation.getRecommendations` | Query | 个性化技能推荐 |
-| `agents.rating.updateSkillRating` | Mutation | 评分 + TrueSkill 更新 + NFT 次数递增 |
-| `agents.nft.mintSkillNft` | Mutation | 铸造技能 NFT 凭证 |
-| `agents.nft.getUserNfts` | Query | 查询用户 NFT 列表 |
-| `agents.nft.verifyNft` | Query | 验证 NFT 真实性 |
-
-## Multi-Agent 架构
-
-```
-用户操作 → 中枢调度 Agent (orchestrator.handleUserAction)
-              │
-              ├── action: "match"
-              │   └── 匹配 Agent → TrueSkill 评分对比 (70%) + NFT 交换次数 (30%)
-              │                   → 返回 Top 5 最佳匹配 + 缓存 1 小时
-              │
-              ├── action: "recommend"
-              │   └── 推荐 Agent → 历史交换记录 + 技能标签相似度
-              │                   → 按"评分 + NFT次数×2"排序去重
-              │
-              ├── action: "rating"
-              │   └── 评分 Agent → 双方互评后触发 TrueSkill 更新
-              │                   → 正向(≥4分): mu↑ sigma↓ | 负向(<4分): mu↓ sigma↑
-              │
-              └── action: "nft_mint"
-                  └── NFT Agent → 生成元数据 → Convex Storage 存储
-                                → Demo: 模拟 tokenId | Prod: Polygon mint
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3000
 ```
 
-## AI 功能详情
+Update the frontend's `lib/api-client.ts` to use `NEXT_PUBLIC_API_BASE_URL` as the base URL for all API calls. See [FRONTEND_BACKEND_SPEC.md](./FRONTEND_BACKEND_SPEC.md) for details.
 
-### 翻译助手
-调用 `ai.processAI({ action: "translate", context: "内容", targetLanguage: "English" })`
-
-### 合同生成
-调用 `ai.processAI({ action: "contract", context: "对话上下文" })`，自动生成 Markdown 格式技能交换协议。
-
-### AI 配对聊天
-调用 `ai.matchChat({ messages: [...] })`，多轮对话收集用户需求，当信息足够时返回 `matchSuggestion` 推荐结果。
-
-## 数据库 Schema（10 张表）
-
-| 表名 | 用途 | 关键索引 |
-|------|------|----------|
-| `users` | 用户（Clerk + TrueSkill + NFT） | `by_clerkId`, `search_name` |
-| `skills` | 可交换技能 | `by_userId`, `by_skillTag`, `by_category`, `search_title` |
-| `sessions` | 交换会话 | `by_requesterId`, `by_providerId`, `by_status` |
-| `contacts` | 联系人 | `by_userId`, `by_contactUserId` |
-| `messages` | 聊天消息 | `by_conversationId`, `by_senderId`, `by_receiverId` |
-| `posts` | 社区帖子 | `by_userId` |
-| `communityUpdates` | 社区动态 | — |
-| `reviews` | 评价 | `by_userId`, `by_reviewerId` |
-| `matchCache` | AI 匹配缓存（1h TTL） | `by_userId` |
-| `aiConversations` | AI 对话历史 | `by_userId` |
-
-## 前端集成示例
-
-```typescript
-"use client";
-import { useQuery, useMutation, useAction } from "convex/react";
-import { api } from "@/convex/_generated/api";
-
-// 实时订阅数据
-const user = useQuery(api.users.me);
-const skills = useQuery(api.skills.list, { category: "编程" });
-
-// 调用 Mutation
-const createSkill = useMutation(api.skills.create);
-await createSkill({ skillTag: "React", title: "React 教学", level: "advanced" });
-
-// 调用 AI Action
-const matchChat = useAction(api.ai.matchChat);
-const { reply, matchSuggestion } = await matchChat({
-  messages: [{ role: "user", content: "我想学吉他" }]
-});
-
-// 中枢调度
-const handleAction = useMutation(api.agents.orchestrator.handleUserAction);
-const matches = await handleAction({ action: "match", payload: { skillTag: "React" } });
-```
-
-## 渐进式评分系统
+## Multi-Agent Architecture
 
 ```
-渐进式技能评分 (Progressive Skill Rating)
-    │
-    ├── 维度一：AI 社交媒体分析 (30%)
-    │   ├── 授权绑定 B站 / 小红书 / YouTube / 公众号
-    │   ├── AI 读取解析：文本、视频、图片、评论区
-    │   └── 评分维度：持续性(40%) × 深度(35%) × 社区认可(25%)
-    │
-    ├── 维度二：社区反馈 (50%)
-    │   ├── 公开反馈帖（交换确认后自动触发）
-    │   ├── 私聊互动（Soul 式里程碑点亮）
-    │   └── 双方互评（TrueSkill 更新）
-    │
-    └── 维度三：NFT 成就 (20%)
-        ├── 交换见证 NFT（AI 生成故事 + 贡献度分配）
-        ├── NFT 橱窗（展示交换故事和能力背书）
-        └── 成就集卡（互动解锁勋章）
+User Action → Orchestrator Agent (orchestrator.handleUserAction)
+                │
+                ├── match    → Matching Agent → TrueSkill (70%) + NFT weight (30%)
+                ├── recommend → Recommendation Agent → History + Tag similarity
+                ├── rating   → Rating Agent → Mutual scoring → TrueSkill update
+                └── nft_mint → NFT Agent → Metadata → Convex Storage / Polygon
 ```
 
-### Soul 式成就系统
+## Progressive Skill Rating
 
-| 关系等级 | 条件 | 勋章 |
-|---------|------|------|
-| 🤝 初识 | 完成 1 次交换 | 初次交换 |
-| 📚 活跃 | 发布 3+ 反馈 | 活跃学习者 |
-| 💬 知音 | 私聊 50+ 条 | 知音 |
-| ⚡ 搭档 | 7天互动 + 3次交换 | 默契搭档 |
-| ✨ 灵魂伙伴 | 30天 + 5次交换 + 200消息 + 10反馈 | 灵魂伙伴 |
+```
+Progressive Rating = Social (30%) + Community (50%) + NFT (20%)
 
-### 新增 API
+├── Social Media Analysis (30%)
+│   ├── Bind: Bilibili / Xiaohongshu / YouTube / WeChat
+│   └── AI scores: Consistency × Depth × Engagement
+│
+├── Community Feedback (50%)
+│   ├── Public feedback threads (auto-created)
+│   ├── Chat interactions (Soul-style milestones)
+│   └── Mutual reviews (TrueSkill update)
+│
+└── NFT Achievement (20%)
+    ├── Story-based NFTs (AI-generated exchange stories)
+    ├── NFT showcase (proof of skill exchange)
+    └── Achievement badges (unlocked by interactions)
+```
 
-| 函数 | 类型 | 说明 |
-|------|------|------|
-| `socialMedia.linkAccount` | Mutation | 绑定社交媒体账号 |
-| `socialMedia.analyzeAccount` | Action | AI 分析社交媒体内容 |
-| `socialMedia.getSocialScore` | Query | 获取社交媒体评分 |
-| `exchangeThreads.createThread` | Mutation | 创建交换反馈帖 |
-| `exchangeThreads.addPost` | Mutation | 发布反馈（进度/反馈/表扬） |
-| `exchangeThreads.listPublicThreads` | Query | 公开反馈帖列表 |
-| `milestones.updateInteraction` | Mutation | 更新互动数据 + 解锁成就 |
-| `milestones.getMilestone` | Query | 获取双方互动里程碑 |
-| `milestones.getMyBadges` | Query | 获取所有成就勋章 |
-| `agents.nft.mintStoryNft` | Mutation | 铸造交换见证 NFT |
-| `agents.nft.getShowcase` | Query | NFT 橱窗展示 |
-| `agents.nft.viewStory` | Mutation | 查看 NFT 故事详情 |
-| `progressiveScoring.recalculate` | Mutation | 重算渐进式综合评分 |
-| `progressiveScoring.getScore` | Query | 获取评分详情 |
-| `progressiveScoring.getLeaderboard` | Query | 排行榜 |
+## Deployment
 
-## 部署
-
-### Convex 后端部署
+### Convex Backend
 ```bash
 npx convex deploy
 ```
 
-### Render 部署（Next.js 前端）
-1. 推送代码到 GitHub
-2. 在 [Render](https://dashboard.render.com) 创建 Web Service
-3. Build Command: `npm install && npm run build`
-4. Start Command: `npx next start -p $PORT`
-5. 配置环境变量（Clerk 密钥 + Convex URL）
+### Render (Next.js API Server)
+1. Push to GitHub
+2. Create Web Service on [Render](https://dashboard.render.com)
+3. Build: `npm install && npm run build`
+4. Start: `npx next start -p $PORT`
+5. Set environment variables
 
 ## License
 

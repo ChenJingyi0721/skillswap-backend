@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { Providers } from "./providers";
-import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "SkillSwap - 技能交换平台",
-  description: "基于 AI 匹配与 NFT 信任背书的技能交换平台",
+  title: "SkillSwap Backend API",
+  description: "Backend API for the SkillSwap skill exchange platform",
 };
 
 export default function RootLayout({
@@ -13,8 +12,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="zh-CN">
-      <body className="min-h-screen">
+    <html lang="en">
+      <body>
         <Providers>{children}</Providers>
       </body>
     </html>
