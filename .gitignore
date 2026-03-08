@@ -7,8 +7,8 @@ out/
 dist/
 *.tsbuildinfo
 
-# Convex generated
-convex/_generated/
+# Convex generated (committed for deployment)
+# convex/_generated/
 
 # OS files
 .DS_Store
